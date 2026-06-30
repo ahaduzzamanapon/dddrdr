@@ -683,13 +683,16 @@ def player_page(channel_id):
     is_proxied = False
     
     headers = active_server["headers"]
-    if (headers or 
-        "aiv-cdn" in stream_url_lower or 
-        "fancode" in stream_url_lower or 
-        "rockstreamer" in stream_url_lower or 
-        "aynascope" in stream_url_lower):
-        
+    
+    # We no longer force proxy any domains by default.
+    # The player will attempt direct connection first (which uses the user's native BD IP).
+    # If CORS fails, the player's JavaScript will automatically reload with force_proxy=true.
+    
+    # Auto-proxy http streams because modern browsers block http streams on https websites (Mixed Content)
+    if stream_url_lower.startswith("http://"):
         is_proxied = True
+        
+    if is_proxied:
         headers = auto_inject_headers(stream_url, headers)
         headers_encoded = json.dumps(headers)
         if '.mpd' in stream_url_lower:
