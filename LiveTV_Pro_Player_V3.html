@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SM Live TV Web Player (Pro)</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Video.js CSS -->
+    <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+    <style>
+        body { background: #0f0f1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .card { background-color: #1a1a2e; border: 1px solid #2a2a4a; }
+        .channel-list { max-height: 600px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #e94560 #1a1a2e; }
+        .channel-list::-webkit-scrollbar { width: 8px; }
+        .channel-list::-webkit-scrollbar-thumb { background-color: #e94560; border-radius: 4px; }
+        
+        /* Updated Channel Item Design */
+        .channel-item { 
+            cursor: pointer; 
+            transition: all 0.2s ease-in-out; 
+            border-radius: 8px; 
+            margin-bottom: 8px; 
+            border: 1px solid transparent; 
+            background-color: #16213e; /* Solid background */
+            display: flex;
+            align-items: center;
+            padding: 10px;
+        }
+        .channel-item:hover, .channel-item.active { 
+            background-color: #1f2d50; 
+            border-color: #e94560; 
+        }
+        
+        .nav-tabs { border-bottom: 2px solid #16213e; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; white-space: nowrap; }
+        .nav-tabs::-webkit-scrollbar { height: 4px; }
+        .nav-tabs::-webkit-scrollbar-thumb { background-color: #e94560; }
+        .nav-tabs .nav-link { color: #888; border: none; padding: 10px 20px; }
+        .nav-tabs .nav-link.active { background-color: transparent; color: #fff; border-bottom: 3px solid #e94560; font-weight: bold; }
+        .header-title { color: #e94560; font-weight: 800; letter-spacing: 1px; }
+        .badge-custom { background-color: #e94560; }
+        .video-container { border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8); background: #000; width: 100%; }
+        
+        /* Fixed Video Player Size Issue */
+        .video-js {
+            width: 100% !important;
+            height: 450px !important;
+        }
+
+        .proxy-toggle { font-size: 0.85rem; }
+        
+        /* Updated Channel Logo Design */
+        .channel-logo { 
+            width: 50px; 
+            height: 50px; 
+            min-width: 50px; /* Prevent shrinking */
+            object-fit: contain; 
+            background: #fff; 
+            border-radius: 6px; 
+            margin-right: 15px; /* Added spacing */
+        }
+        
+        /* Fixed text layout inside channel item */
+        .channel-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .chan-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 0;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid py-4 px-lg-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h2 class="header-title mb-2 mb-md-0">📺 SM Live TV - Pro Web Player</h2>
+        <div class="form-check form-switch proxy-toggle text-warning">
+            <input class="form-check-input" type="checkbox" id="useProxy">
+            <label class="form-check-label" for="useProxy">Use CORS Proxy (Bypass Errors)</label>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Video Player Area -->
+        <div class="col-lg-7 mb-4">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="video-container">
+                    <video id="tvPlayer" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto" data-setup="{}">
+                    </video>
+                </div>
+                <div class="mt-3 p-3 card rounded shadow-sm">
+                    <h4 id="currentChannelName" class="mb-1 text-white">Select a Channel</h4>
+                    <p id="currentChannelGroup" class="mb-0 text-muted small">Please select a channel from the list.</p>
+                    <div id="channelParams" class="mt-2 text-info" style="font-size: 12px; font-family: monospace; word-wrap: break-word;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Channel List Area -->
+        <div class="col-lg-5">
+            <div class="card p-3 rounded shadow-sm">
+                <!-- Search Box -->
+                <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary mb-3" placeholder="🔍 Search channel...">
+                
+                <!-- Categories -->
+                <ul class="nav nav-tabs mb-3" id="categoryTabs" role="tablist"></ul>
+                
+                <!-- Channels -->
+                <div class="tab-content channel-list pe-2" id="channelContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video.js and HLS source -->
+<script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+<script>
+    const M3U_URL = 'https://raw.githubusercontent.com/sm-monirulislam/SM-Live-TV/refs/heads/main/Combined_Live_TV.m3u';
+    let allChannels = [];
+    let player;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        player = videojs('tvPlayer', {
+            html5: {
+                hls: {
+                    overrideNative: true,
+                    beforeRequest: function(options) {
+                        const activeIndex = window.currentChannelIndex;
+                        if (activeIndex !== undefined) {
+                            const chan = allChannels[activeIndex];
+                            if(chan && Object.keys(chan.params).length > 0) {
+                                options.headers = options.headers || {};
+                                for(let key in chan.params) {
+                                    options.headers[key] = chan.params[key];
+                                }
+                            }
+                        }
+                        return options;
+                    }
+                }
+            }
+        });
+        loadPlaylist();
+    });
+
+    async function loadPlaylist() {
+        try {
+            const response = await fetch(M3U_URL);
+            const data = await response.text();
+            parseM3U(data);
+            renderUI();
+        } catch (error) {
+            console.error(error);
+            alert("Failed to load M3U. Check internet or CORS issues.");
+        }
+    }
+
+    function parseM3U(data) {
+        const lines = data.split(/\r?\n/);
+        let tempChannel = {};
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line) continue;
+
+            if (line.startsWith('#EXTINF:')) {
+                const lastCommaIndex = line.lastIndexOf(',');
+                tempChannel.name = lastCommaIndex !== -1 ? line.substring(lastCommaIndex + 1).trim() : 'Unknown Channel';
+                
+                const groupMatch = line.match(/group-title="([^"]*)"/i);
+                // Fix for the "undefined" tab issue shown in screenshot
+                tempChannel.group = (groupMatch && groupMatch[1].trim() !== "") ? groupMatch[1] : 'Others';
+                
+                const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
+                tempChannel.logo = logoMatch ? logoMatch[1] : '';
+
+                tempChannel.params = {};
+            } 
+            else if (line.startsWith('#EXTVLCOPT:')) {
+                if(!tempChannel.params) tempChannel.params = {};
+                const opt = line.replace('#EXTVLCOPT:', '');
+                const parts = opt.split('=');
+                if(parts.length >= 2) {
+                    tempChannel.params[parts[0]] = parts.slice(1).join('=');
+                }
+            }
+            else if (line.startsWith('http')) {
+                let streamUrl = line;
+                if(!tempChannel.params) tempChannel.params = {};
+
+                if (streamUrl.includes('|')) {
+                    const parts = streamUrl.split('|');
+                    streamUrl = parts[0];
+                    const paramStr = parts.slice(1).join('|');
+                    const paramPairs = paramStr.split('&');
+                    paramPairs.forEach(pair => {
+                        const [k, ...v] = pair.split('=');
+                        if(k && v.length > 0) {
+                            tempChannel.params[k] = decodeURIComponent(v.join('='));
+                        }
+                    });
+                }
+                
+                tempChannel.url = streamUrl;
+                allChannels.push({...tempChannel});
+                tempChannel = {}; 
+            }
+        }
+    }
+
+    function renderUI() {
+        const categories = [...new Set(allChannels.map(c => c.group))];
+        const tabsContainer = document.getElementById('categoryTabs');
+        const contentContainer = document.getElementById('channelContent');
+
+        tabsContainer.innerHTML = '';
+        contentContainer.innerHTML = '';
+
+        categories.forEach((cat, index) => {
+            const activeClass = index === 0 ? 'active' : '';
+            const safeId = 'cat-' + index;
+
+            tabsContainer.innerHTML += `
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link ${activeClass}" id="${safeId}-tab" data-bs-toggle="tab" data-bs-target="#${safeId}" type="button">${cat}</button>
+                </li>
+            `;
+
+            const channelsInCat = allChannels.filter(c => c.group === cat);
+            const channelHtml = channelsInCat.map(c => {
+                const cIndex = allChannels.indexOf(c);
+                const fallbackLogo = `<div class="bg-secondary text-white d-flex justify-content-center align-items-center channel-logo" style="font-size:12px; font-weight:bold;">TV</div>`;
+                const logoHtml = c.logo ? `<img src="${c.logo}" class="channel-logo" onerror="this.outerHTML='${fallbackLogo}'">` : fallbackLogo;
+                
+                // Fixed the HTML structure to prevent the breaking text issue
+                return `
+                <div class="channel-item search-item" id="chan-${cIndex}" onclick="playChannel(${cIndex})">
+                    ${logoHtml}
+                    <div class="channel-info">
+                        <h6 class="text-white chan-name" title="${c.name}">${c.name}</h6>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            contentContainer.innerHTML += `
+                <div class="tab-pane fade ${index === 0 ? 'show active' : ''}" id="${safeId}" role="tabpanel">
+                    ${channelHtml}
+                </div>
+            `;
+        });
+        
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.search-item').forEach(item => {
+                const name = item.querySelector('.chan-name').innerText.toLowerCase();
+                item.style.display = name.includes(term) ? 'flex' : 'none';
+            });
+        });
+    }
+
+    window.playChannel = function(index) {
+        window.currentChannelIndex = index;
+        document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+        const activeItem = document.getElementById('chan-' + index);
+        if(activeItem) activeItem.classList.add('active');
+
+        // Note: Used Jhamela TV as per user instruction from historical ledger
+        const channel = allChannels[index];
+        let displayName = channel.name;
+        if(displayName.trim().toLowerCase() === "jamuna tv") {
+            displayName = "Jhamela TV";
+        }
+
+        document.getElementById('currentChannelName').innerText = displayName;
+        document.getElementById('currentChannelGroup').innerHTML = `<span class="badge badge-custom">${channel.group}</span>`;
+        
+        let paramText = "Found Parameters: ";
+        if(Object.keys(channel.params).length > 0) {
+            paramText += JSON.stringify(channel.params);
+        } else {
+            paramText += "None";
+        }
+        document.getElementById('channelParams').innerText = paramText;
+
+        let finalUrl = channel.url;
+        const useProxy = document.getElementById('useProxy').checked;
+        
+        if(useProxy) {
+            finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(finalUrl);
+        }
+
+        player.src({
+            src: finalUrl,
+            type: 'application/x-mpegURL'
+        });
+        player.play();
+    }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

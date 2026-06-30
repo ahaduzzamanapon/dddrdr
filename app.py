@@ -507,6 +507,45 @@ def proxy_m3u8():
         logger.error(f"Error proxying playlist {target_url}: {e}")
         return f"Proxying error: {e}", 502
 
+@app.route('/proxy/mpd')
+def proxy_mpd():
+    """Proxy endpoint for DASH manifests (.mpd) to bypass CORS and inject BaseURL."""
+    target_url = request.args.get('url')
+    headers_str = request.args.get('headers', '{}')
+    
+    if not target_url:
+        return "Missing URL parameter", 400
+        
+    try:
+        headers = json.loads(headers_str)
+    except Exception:
+        headers = {}
+        
+    headers = auto_inject_headers(target_url, headers)
+    if 'User-Agent' not in headers:
+        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        
+    try:
+        r = requests.get(target_url, headers=headers, timeout=15, verify=False)
+        r.raise_for_status()
+        
+        # Inject BaseURL so relative segments work natively without proxying them
+        base_url = target_url.rsplit('/', 1)[0] + '/'
+        content = r.text
+        
+        # Find the end of <MPD ... > opening tag and inject BaseURL right after it
+        mpd_end_idx = content.find('>', content.find('<MPD'))
+        if mpd_end_idx != -1:
+            base_url_tag = f'\n  <BaseURL>{base_url}</BaseURL>'
+            content = content[:mpd_end_idx+1] + base_url_tag + content[mpd_end_idx+1:]
+            
+        response = Response(content, content_type='application/dash+xml')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        logger.error(f"Error proxying MPD {target_url}: {e}")
+        return f"Proxying error: {e}", 502
+
 @app.route('/proxy/ts')
 def proxy_ts():
     """Proxy endpoint for video segments (.ts / .mp4 / key files) to inject headers."""
@@ -645,19 +684,16 @@ def player_page(channel_id):
     
     headers = active_server["headers"]
     if (headers or 
-        "toffeelive" in stream_url_lower or 
         "aiv-cdn" in stream_url_lower or 
-        "sm-monirul" in stream_url_lower or 
         "fancode" in stream_url_lower or 
         "rockstreamer" in stream_url_lower or 
-        "gpcdn.net" in stream_url_lower or 
         "aynascope" in stream_url_lower):
         
         is_proxied = True
         headers = auto_inject_headers(stream_url, headers)
         headers_encoded = json.dumps(headers)
         if '.mpd' in stream_url_lower:
-            stream_url = f"/proxy/ts?url={urllib.parse.quote_plus(stream_url)}&headers={urllib.parse.quote_plus(headers_encoded)}"
+            stream_url = f"/proxy/mpd?url={urllib.parse.quote_plus(stream_url)}&headers={urllib.parse.quote_plus(headers_encoded)}"
         else:
             stream_url = f"/proxy/m3u8?url={urllib.parse.quote_plus(stream_url)}&headers={urllib.parse.quote_plus(headers_encoded)}"
             
