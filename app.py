@@ -627,6 +627,7 @@ def player_page(channel_id):
     headers = active_server["headers"]
     if (headers or 
         "toffeelive" in stream_url_lower or 
+        "aiv-cdn" in stream_url_lower or 
         "sm-monirul" in stream_url_lower or 
         "fancode" in stream_url_lower or 
         "rockstreamer" in stream_url_lower or 
