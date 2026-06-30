@@ -141,7 +141,7 @@ def auto_inject_headers(url, headers):
             injected['Origin'] = 'https://www.bioscopelive.com'
             
     # Toffee streams
-    elif "toffeelive" in url_lower:
+    elif "toffeelive" in url_lower or "aiv-cdn" in url_lower:
         if 'Referer' not in injected:
             injected['Referer'] = 'https://toffeelive.com/'
             
