@@ -208,7 +208,9 @@ def parse_m3u_content(m3u_text):
                 "logo": logo,
                 "group": group,
                 "headers": {},
-                "url": ""
+                "url": "",
+                "drm_type": "",
+                "drm_key": ""
             }
             
         elif line.startswith("#EXTVLCOPT:"):
@@ -238,6 +240,19 @@ def parse_m3u_content(m3u_text):
                         current_channel["headers"][standard_k] = v
                 except Exception:
                     pass
+                    
+        elif line.startswith("#KODIPROP:"):
+            if current_channel is not None:
+                opt = line[len("#KODIPROP:"):].strip()
+                if '=' in opt:
+                    key, val = opt.split('=', 1)
+                    key = key.strip().lower()
+                    val = val.strip()
+                    
+                    if "license_type" in key:
+                        current_channel["drm_type"] = val
+                    elif "license_key" in key:
+                        current_channel["drm_key"] = val
                     
         elif not line.startswith("#"):
             if current_channel is not None:
@@ -327,7 +342,9 @@ def reload_channels():
                 parent["servers"].append({
                     "name": f"Server {srv_num}",
                     "url": ch["url"],
-                    "headers": ch["headers"]
+                    "headers": ch["headers"],
+                    "drm_type": ch.get("drm_type", ""),
+                    "drm_key": ch.get("drm_key", "")
                 })
                 
             if not parent["logo"] and ch["logo"]:
@@ -341,7 +358,9 @@ def reload_channels():
                     {
                         "name": "Server 1",
                         "url": ch["url"],
-                        "headers": ch["headers"]
+                        "headers": ch["headers"],
+                        "drm_type": ch.get("drm_type", ""),
+                        "drm_key": ch.get("drm_key", "")
                     }
                 ]
             }
@@ -642,9 +661,12 @@ def player_page(channel_id):
         else:
             stream_url = f"/proxy/m3u8?url={urllib.parse.quote_plus(stream_url)}&headers={urllib.parse.quote_plus(headers_encoded)}"
             
+    drm_type = active_server.get("drm_type", "")
+    drm_key = active_server.get("drm_key", "")
+    
     return render_template('player.html', channel=ch, stream_url=stream_url, 
                            recommendations=recommendations, is_proxied=is_proxied, 
-                           current_server_index=server_idx)
+                           current_server_index=server_idx, drm_type=drm_type, drm_key=drm_key)
 
 # ==============================================================================
 # Admin Panel & Live Analytics Routes

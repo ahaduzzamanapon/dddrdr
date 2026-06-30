@@ -171,6 +171,38 @@
                 },
                 mpd: function (video, url) {
                     const dashPlayer = dashjs.MediaPlayer().create();
+                    
+                    const drmType = "{{ drm_type | safe }}";
+                    const drmKey = "{{ drm_key | safe }}";
+                    
+                    if (drmType && drmKey) {
+                        if (drmType.toLowerCase() === 'clearkey') {
+                            const parts = drmKey.split(':');
+                            if (parts.length === 2) {
+                                const keyId = parts[0].trim();
+                                const keyValue = parts[1].trim();
+                                
+                                const protectionData = {
+                                    "org.w3.clearkey": {
+                                        "clearkeys": {}
+                                    }
+                                };
+                                protectionData["org.w3.clearkey"]["clearkeys"][keyId] = keyValue;
+                                
+                                dashPlayer.setProtectionData(protectionData);
+                                console.log("ClearKey DRM loaded successfully:", protectionData);
+                            }
+                        } else if (drmType.toLowerCase() === 'com.widevine.alpha' || drmType.toLowerCase() === 'widevine') {
+                            const protectionData = {
+                                "com.widevine.alpha": {
+                                    "serverURL": drmKey
+                                }
+                            };
+                            dashPlayer.setProtectionData(protectionData);
+                            console.log("Widevine DRM loaded successfully:", protectionData);
+                        }
+                    }
+                    
                     dashPlayer.initialize(video, url, true);
                     art.dash = dashPlayer;
                 }
