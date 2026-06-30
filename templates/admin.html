@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - Live TV{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between;">
+    <h1 style="font-family: var(--font-heading); font-size: 2.25rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        Admin Control Dashboard
+    </h1>
+    <span class="proxy-indicator" style="background: rgba(129, 140, 248, 0.15); border-color: var(--primary); color: #c7d2fe;">
+        System Operational
+    </span>
+</div>
+
+<!-- Grid section for analytics cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+    
+    <!-- Active Viewers Card -->
+    <div class="channel-card" style="align-items: flex-start; padding: 1.75rem; width: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 1rem;">
+            <span style="font-family: var(--font-heading); font-size: 1.05rem; font-weight: 600; color: var(--text-muted);">Active Viewers</span>
+            <span style="background: rgba(244, 63, 94, 0.15); color: #fda4af; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">Live Now</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-family: var(--font-heading); font-size: 3.5rem; font-weight: 800; line-height: 1; color: var(--text-main);">{{ active_count }}</span>
+            <span style="color: var(--text-muted); font-size: 0.95rem;">online users</span>
+        </div>
+        <p style="color: var(--text-dim); font-size: 0.85rem;">Sessions active within the last 2 minutes.</p>
+    </div>
+    
+    <!-- Device Diagnostics Card -->
+    <div class="channel-card" style="align-items: flex-start; padding: 1.75rem; width: 100%;">
+        <span style="font-family: var(--font-heading); font-size: 1.05rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1.25rem;">Active Devices</span>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
+            {% for dev, count in device_counts.items() %}
+                {% if count > 0 or dev in ["Desktop", "Mobile", "Smart TV"] %}
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.9rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i data-lucide="{% if dev == 'Desktop' %}monitor{% elif dev == 'Mobile' %}smartphone{% elif dev == 'Tablet' %}tablet{% elif dev == 'Smart TV' %}tv-2{% else %}play{% endif %}" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                        <span>{{ dev }}</span>
+                    </div>
+                    <span style="font-weight: 700; color: var(--text-main);">{{ count }}</span>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    
+</div>
+
+<!-- Layout for Config Forms & Sessions Table -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+    
+    <!-- Left Column: Configuration Form -->
+    <div class="channel-meta-section" style="margin-top: 0;">
+        <h2 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="layout" style="color: var(--secondary);"></i> Configure Homepage Banner
+        </h2>
+        
+        <form action="/admin/save-banner" method="POST" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            
+
+            
+            <!-- Primary Channel -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted);">Primary Featured Channel (Banner Click Action)</label>
+                <select name="primary_channel_id" class="search-input" style="padding-left: 1rem; border-radius: 8px; background: #0c0f1d; color: var(--text-main); appearance: none;" required>
+                    <option value="" disabled {% if not banner_config.primary_channel_id %}selected{% endif %}>-- Select Channel --</option>
+                    {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% if banner_config.primary_channel_id == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Recommended sidebar streams selection -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted);">Banner Recommended Sidebar Channels</label>
+                <p style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem;">Select channels to display in the recommended sidebar when watching the banner stream.</p>
+                
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 8px; max-height: 180px; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    {% for ch in channels %}
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; color: var(--text-muted);">
+                        <input type="checkbox" name="recommended_channel_ids" value="{{ ch.id }}" {% if ch.id in banner_config.recommended_channel_ids %}checked{% endif %} style="accent-color: var(--primary);">
+                        <span>{{ ch.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Adsterra Scripts Configuration Section -->
+            <div style="border-top: 1px solid var(--border-glass); margin-top: 1.5rem; padding-top: 1.5rem;">
+                <h3 style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 600; color: var(--secondary); margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="megaphone"></i> Adsterra Ad Unit Scripts
+                </h3>
+                
+                <!-- Popunder Code -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">Popunder Script (Global Head)</label>
+                    <textarea name="ad_popunder" rows="2" class="search-input" style="padding-left: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; resize: vertical; height: auto;" placeholder="Paste Adsterra Popunder script code here...">{{ banner_config.ad_popunder }}</textarea>
+                </div>
+                
+                <!-- Social Bar Code -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">Social Bar Script (Global Footer)</label>
+                    <textarea name="ad_socialbar" rows="2" class="search-input" style="padding-left: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; resize: vertical; height: auto;" placeholder="Paste Adsterra Social Bar script code here...">{{ banner_config.ad_socialbar }}</textarea>
+                </div>
+                
+                <!-- Leaderboard 728x90 Code -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">Leaderboard Banner 728x90 Code (Page Header)</label>
+                    <textarea name="ad_leaderboard" rows="2" class="search-input" style="padding-left: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; resize: vertical; height: auto;" placeholder="Paste Adsterra 728x90 banner script code here...">{{ banner_config.ad_leaderboard }}</textarea>
+                </div>
+                
+                <!-- Sidebar 300x250 Code -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-muted);">Medium Rectangle 300x250 Code (Player Sidebar)</label>
+                    <textarea name="ad_sidebar" rows="2" class="search-input" style="padding-left: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.8rem; resize: vertical; height: auto;" placeholder="Paste Adsterra 300x250 banner script code here...">{{ banner_config.ad_sidebar }}</textarea>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="align-self: flex-start; margin-top: 1.5rem;">
+                <i data-lucide="check-circle"></i> Save Settings
+            </button>
+            
+        </form>
+    </div>
+    
+    <!-- Right Column: Active User Session Details -->
+    <div class="channel-meta-section" style="margin-top: 0;">
+        <h2 style="font-family: var(--font-heading); font-size: 1.35rem; font-weight: 700; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i data-lucide="users" style="color: var(--primary);"></i> Active Viewer Logs
+        </h2>
+        
+        <div style="overflow-x: auto; background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); border-radius: 8px; max-height: 480px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.02); color: var(--text-muted);">
+                        <th style="padding: 0.75rem 1rem;">User ID / IP</th>
+                        <th style="padding: 0.75rem 1rem;">Device</th>
+                        <th style="padding: 0.75rem 1rem;">User-Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in online_sessions %}
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-muted);">
+                        <td style="padding: 0.75rem 1rem; color: var(--text-main); font-weight: 500;">
+                            User_{{ loop.index }} ({{ session.user_agent[:4] }}...)
+                        </td>
+                        <td style="padding: 0.75rem 1rem;">
+                            <span class="channel-category" style="font-size: 0.7rem; background: rgba(255,255,255,0.04);">{{ session.device }}</span>
+                        </td>
+                        <td style="padding: 0.75rem 1rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ session.user_agent }}">
+                            {{ session.user_agent }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="padding: 2rem; text-align: center; color: var(--text-dim);">No active sessions monitored.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+</div>
+
+{% endblock %}

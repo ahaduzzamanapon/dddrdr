@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Live TV Streaming Server - Stream 360+ Live TV Channels, Sports, Entertainment, and Movies without lag or buffer.">
+    <meta name="author" content="Monirul Islam">
+    
+    <title>{% block title %}Live TV - Premium Streaming{% endblock %}</title>
+    
+    <!-- CSS Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Adsterra Popunder Ad Code Injection -->
+    {% if banner_config.ad_popunder %}
+        {{ banner_config.ad_popunder | safe }}
+    {% endif %}
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="nav-container">
+            <a href="/" class="logo-link">
+                <span class="logo-icon">📺</span>
+                <span class="logo-text">LIVE TV <span class="logo-tag">PRO</span></span>
+            </a>
+            
+            <!-- Real-time search bar -->
+            <div class="search-wrapper">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" id="channelSearch" class="search-input" placeholder="Search live channels, sports, news..." onkeyup="onSearchChange()">
+            </div>
+            
+            <nav class="nav-links">
+                <a href="/" class="nav-item {% if not active_category %}active{% endif %}">Home</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <p class="footer-text">© 2026 Live TV Pro. Designed and Maintained with ❤️ in Bangladesh.</p>
+            <div class="footer-links">
+                <a href="/admin" class="footer-link">Admin Panel</a>
+                {% if session.get('admin_logged_in') %}
+                    <a href="/admin/logout" class="footer-link" style="color: var(--accent);">Logout</a>
+                {% endif %}
+            </div>
+        </div>
+    </footer>
+
+    <!-- Lucide Icon Initialization & Global Search Router -->
+    <script>
+        // Global Inline SVG fallback for broken logos
+        const defaultLogo = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><path d="m17 2-5 5-5-5"/></svg>';
+        
+        // Global error handler to break image loading loops
+        function handleLogoError(img) {
+            img.onerror = null; // Clear handler to prevent infinite loop if SVG fails (impossible, but safe)
+            img.src = defaultLogo;
+        }
+
+        lucide.createIcons();
+        
+        function onSearchChange() {
+            if (window.filterChannels) {
+                window.filterChannels();
+            } else {
+                const query = document.getElementById('channelSearch').value;
+                if (query.trim().length > 0) {
+                    window.location.href = '/?q=' + encodeURIComponent(query);
+                }
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+
+    <!-- Adsterra Social Bar Ad Code Injection -->
+    {% if banner_config.ad_socialbar %}
+        {{ banner_config.ad_socialbar | safe }}
+    {% endif %}
+</body>
+</html>

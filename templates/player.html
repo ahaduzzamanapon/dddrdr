@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}Watching {{ channel.name }} - Live TV{% endblock %}
+
+{% block content %}
+
+<!-- Adsterra Header Leaderboard slot (728x90) -->
+{% if banner_config.ad_leaderboard %}
+<div class="ad-container ad-leaderboard" style="margin-top: 0; margin-bottom: 1.5rem;">
+    {{ banner_config.ad_leaderboard | safe }}
+</div>
+{% endif %}
+
+<div class="player-container">
+    
+    <!-- Left Column: Video Player and Metadata -->
+    <div class="player-left-col">
+        
+        <!-- Video Player Wrapper -->
+        <div class="video-player-wrapper">
+            <div class="artplayer-container"></div>
+        </div>
+        
+        <!-- Channel Metadata Details -->
+        <div class="channel-meta-section">
+            <div class="channel-meta-header">
+                <div class="channel-title-group">
+                    <img src="{% if channel.logo and channel.logo.strip() %}{{ channel.logo }}{% else %}data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818cf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='20' height='15' x='2' y='7' rx='2' ry='2'/><path d='m17 2-5 5-5-5'/></svg>{% endif %}" class="player-channel-logo" alt="{{ channel.name }}" onerror="handleLogoError(this)">
+                    <div>
+                        <h1 class="channel-meta-title">{{ channel.name }}</h1>
+                        <span class="channel-category">{% for g in channel.groups %}{{ g }}{% if not loop.last %} • {% endif %}{% endfor %}</span>
+                    </div>
+                </div>
+                
+                {% if is_proxied %}
+                    <span class="proxy-indicator" title="Stream routed through server to bypass CORS/geo-restrictions">Proxied Secure</span>
+                {% else %}
+                    <span class="proxy-indicator" style="background: rgba(129, 140, 248, 0.15); border-color: var(--primary); color: #c7d2fe;">Direct Stream</span>
+                {% endif %}
+            </div>
+            
+            <div class="channel-meta-body">
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">
+                    Currently playing a high-speed live stream of <strong>{{ channel.name }}</strong>. 
+                    If you experience buffering issues, please check your network connection or switch to an alternate server.
+                </p>
+
+                <!-- Server Selector List -->
+                {% if channel.servers|length > 1 %}
+                <div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                    <span style="font-weight: 600; color: var(--text-muted); font-size: 0.95rem;">Available Servers:</span>
+                    {% for server in channel.servers %}
+                        <a href="/play/{{ channel.id }}?server={{ loop.index0 }}" class="category-chip {% if current_server_index == loop.index0 %}active{% endif %}" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                            <i data-lucide="server" style="width: 14px; height: 14px;"></i> {{ server.name }}
+                        </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <a href="/" class="category-chip" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                        <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i> Back to Home
+                    </a>
+                    <button onclick="reloadPlayer()" class="category-chip" style="background: rgba(255,255,255,0.05); color: var(--text-main); display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid var(--border-glass);">
+                        <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> Refresh Player
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- Right Column: Sidebar recommendations -->
+    <div class="player-right-col">
+        <div class="sidebar-section">
+            <h3 class="sidebar-title">Recommended Channels</h3>
+            
+            <!-- Adsterra Sidebar Banner (300x250) -->
+            {% if banner_config.ad_sidebar %}
+            <div class="ad-container ad-sidebar">
+                {{ banner_config.ad_sidebar | safe }}
+            </div>
+            {% endif %}
+            
+            <div class="sidebar-scroll">
+                {% for rec in recommendations %}
+                <a href="/play/{{ rec.id }}" class="sidebar-channel-item {% if rec.id == channel.id %}active{% endif %}">
+                    <img src="{% if rec.logo and rec.logo.strip() %}{{ rec.logo }}{% else %}data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23818cf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='20' height='15' x='2' y='7' rx='2' ry='2'/><path d='m17 2-5 5-5-5'/></svg>{% endif %}" class="sidebar-logo" alt="{{ rec.name }}" onerror="handleLogoError(this)">
+                    <div class="sidebar-info">
+                        <h4 class="sidebar-name">{{ rec.name }}</h4>
+                        <span class="sidebar-category">{% for g in rec.groups %}{{ g }}{% if not loop.last %} • {% endif %}{% endfor %}</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<!-- Player libraries CDN -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/dashjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+
+<script>
+    let art;
+    
+    function initPlayer() {
+        art = new Artplayer({
+            container: '.artplayer-container',
+            url: '{{ stream_url | safe }}',
+            isLive: true,
+            autoplay: true,
+            volume: 0.8,
+            muted: false,
+            theme: '#818cf8',
+            pip: true,
+            autoSize: true,
+            autoMini: true,
+            setting: true,
+            fullscreen: true,
+            fullscreenWeb: true,
+            miniProgressBar: true,
+            playsInline: true,
+            airplay: true,
+            customType: {
+                m3u8: function (video, url) {
+                    if (Hls.isSupported()) {
+                        const hls = new Hls({
+                            maxBufferSize: 30 * 1024 * 1024, // Buffer size to 30MB
+                            maxBufferLength: 30, // Keep 30s of buffer length
+                            liveSyncDuration: 3, // Synchronize latency close to live edge
+                            enableWorker: true, // Multi-threaded chunk loading
+                            lowLatencyMode: true // Fast start
+                        });
+                        hls.loadSource(url);
+                        hls.attachMedia(video);
+                        
+                        // Store hls object in player context to destroy on switch
+                        art.hls = hls;
+                        
+                        // Handle fatal network errors and auto-recover
+                        hls.on(Hls.Events.ERROR, function (event, data) {
+                            console.warn("HLS player error event:", data);
+                            if (data.fatal) {
+                                switch (data.type) {
+                                    case Hls.ErrorTypes.NETWORK_ERROR:
+                                        console.log("Fatal network error, retrying segment load...");
+                                        hls.startLoad();
+                                        break;
+                                    case Hls.ErrorTypes.MEDIA_ERROR:
+                                        console.log("Fatal media error, attempting recovery...");
+                                        hls.recoverMediaError();
+                                        break;
+                                    default:
+                                        console.error("Unrecoverable error, re-initializing stream...");
+                                        art.restart();
+                                        break;
+                                }
+                            }
+                        });
+                    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                        video.src = url;
+                    } else {
+                        art.notice.show = 'Unsupported streaming format';
+                    }
+                },
+                mpd: function (video, url) {
+                    const dashPlayer = dashjs.MediaPlayer().create();
+                    dashPlayer.initialize(video, url, true);
+                    art.dash = dashPlayer;
+                }
+            }
+        });
+
+        // Cleanup resources when player is destroyed
+        art.on('destroy', () => {
+            if (art.hls) {
+                art.hls.destroy();
+            }
+            if (art.dash) {
+                art.dash.reset();
+            }
+        });
+    }
+
+    function reloadPlayer() {
+        if (art) {
+            art.destroy();
+        }
+        initPlayer();
+    }
+
+    // Initialize player on load
+    document.addEventListener("DOMContentLoaded", function() {
+        initPlayer();
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
+{% endblock %}

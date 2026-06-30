@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Live TV{% endblock %}
+
+{% block content %}
+
+    <!-- Categories List Navigation -->
+    <div class="categories-bar">
+        <a href="/" class="category-chip {% if not active_category %}active{% endif %}">All Channels</a>
+        {% for cat in categories %}
+            <a href="/category/{{ cat }}" class="category-chip {% if active_category == cat %}active{% endif %}">{{ cat }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Adsterra Header Leaderboard slot (728x90) -->
+    {% if banner_config.ad_leaderboard %}
+    <div class="ad-container ad-leaderboard">
+        {{ banner_config.ad_leaderboard | safe }}
+    </div>
+    {% endif %}
+
+    <!-- Featured Banner Section (only show on homepage when not searching or in category) -->
+    {% if not active_category and featured %}
+    <div class="hero-section" id="featured-banner-section">
+        <div class="hero-banner">
+            <div class="hero-content">
+                <span class="hero-badge">
+                    <span class="live-dot"></span> FIFA World Cup 2026 Special
+                </span>
+                <h1 class="hero-title">FIFA World Cup 2026 Live</h1>
+                <p class="hero-desc">Stream all FIFA World Cup 2026 matches live and buffer-free in premium high-definition proxy quality.</p>
+                <a href="/play/{{ featured[0].id }}?ref=worldcup" class="btn-primary">
+                    <i data-lucide="play-circle"></i> Watch Live: {{ featured[0].name }}
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Channels Container Section -->
+    <div class="category-section">
+        <div class="section-header">
+            <h2 class="section-title" id="page-title">
+                {% if active_category %}{{ active_category }}{% else %}All Channels{% endif %}
+            </h2>
+            <span class="channel-count">
+                Showing <span id="visible-count">0</span> / <span id="total-count">0</span> channels
+            </span>
+        </div>
+        
+        <!-- Target Grid for Batch Rendering -->
+        <div class="channels-grid" id="channels-container"></div>
+        
+        <!-- Infinite Scroll Load Trigger -->
+        <div id="load-more-trigger" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2.5rem 0; color: var(--text-dim); gap: 0.5rem;">
+            <div id="spinner" style="width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; display: none;"></div>
+            <span id="load-more-text" style="font-size: 0.95rem; font-family: var(--font-heading); font-weight: 500;">Loading channels...</span>
+        </div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load channels list safely from Flask as JSON
+    const channels = {{ channels | tojson | safe }};
+    
+    // Pagination controls
+    let currentIndex = 0;
+    const batchSize = 24;
+    let filteredChannels = [...channels];
+    
+    // DOM Elements
+    const container = document.getElementById('channels-container');
+    const trigger = document.getElementById('load-more-trigger');
+    const spinner = document.getElementById('spinner');
+    const loadText = document.getElementById('load-more-text');
+    const visibleCountEl = document.getElementById('visible-count');
+    const totalCountEl = document.getElementById('total-count');
+    const pageTitleEl = document.getElementById('page-title');
+    const featuredBanner = document.getElementById('featured-banner-section');
+    
+    totalCountEl.textContent = channels.length;
+
+    /**
+     * Render the next batch of channels from the filtered list.
+     */
+    function renderNextBatch() {
+        if (currentIndex >= filteredChannels.length) {
+            spinner.style.display = 'none';
+            loadText.textContent = filteredChannels.length > 0 ? "All channels loaded" : "No channels found";
+            return;
+        }
+
+        spinner.style.display = 'block';
+        loadText.textContent = "Loading more channels...";
+        
+        setTimeout(() => {
+            const nextBatch = filteredChannels.slice(currentIndex, currentIndex + batchSize);
+            
+            nextBatch.forEach(ch => {
+                const card = document.createElement('a');
+                card.href = `/play/${ch.id}`;
+                card.className = 'channel-card';
+                card.setAttribute('data-name', ch.name);
+                
+                const displayCat = ch.groups && ch.groups.length > 0 ? ch.groups[0] : 'General';
+                
+                // Pre-check logo string; use global handleLogoError on failure
+                const logoSrc = ch.logo && ch.logo.trim() ? ch.logo : defaultLogo;
+                
+                card.innerHTML = `
+                    <div class="channel-logo-wrapper">
+                        <img src="${logoSrc}" class="channel-logo" alt="${ch.name}" loading="lazy" onerror="handleLogoError(this)">
+                    </div>
+                    <div class="channel-info">
+                        <h3 class="channel-name">${ch.name}</h3>
+                        <span class="channel-category">${displayCat}</span>
+                    </div>
+                    <span class="play-hover-btn">
+                        <i data-lucide="play"></i>
+                    </span>
+                `;
+                container.appendChild(card);
+            });
+
+            currentIndex += nextBatch.length;
+            visibleCountEl.textContent = currentIndex;
+            
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+
+            spinner.style.display = 'none';
+            if (currentIndex >= filteredChannels.length) {
+                loadText.textContent = "All channels loaded";
+            } else {
+                loadText.textContent = "Scroll down to load more";
+            }
+        }, 100);
+    }
+
+    /**
+     * Filters the active channels array and resets container pagination.
+     */
+    window.filterChannels = function() {
+        const query = document.getElementById('channelSearch').value.toLowerCase().trim();
+        
+        if (featuredBanner) {
+            if (query.length > 0) {
+                featuredBanner.style.display = 'none';
+            } else {
+                featuredBanner.style.display = 'block';
+            }
+        }
+        
+        filteredChannels = channels.filter(ch => {
+            const nameMatch = ch.name.toLowerCase().includes(query);
+            const catMatch = ch.groups.some(g => g.toLowerCase().includes(query));
+            return nameMatch || catMatch;
+        });
+
+        container.innerHTML = '';
+        currentIndex = 0;
+        totalCountEl.textContent = filteredChannels.length;
+        
+        if (query.length > 0) {
+            pageTitleEl.textContent = `Search Results for "${query}"`;
+        } else {
+            pageTitleEl.textContent = "{% if active_category %}{{ active_category }}{% else %}All Channels{% endif %}";
+        }
+
+        renderNextBatch();
+    };
+
+    // Intersection Observer to fetch next batch on scroll triggers
+    const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            renderNextBatch();
+        }
+    }, {
+        rootMargin: '250px'
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchQuery = urlParams.get('q');
+        
+        if (searchQuery) {
+            const searchInput = document.getElementById('channelSearch');
+            if (searchInput) {
+                searchInput.value = searchQuery;
+                window.filterChannels();
+            }
+        } else {
+            renderNextBatch();
+        }
+
+        if (trigger) {
+            observer.observe(trigger);
+        }
+    });
+</script>
+{% endblock %}

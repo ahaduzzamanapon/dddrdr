@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_setup %}Set Admin PIN{% else %}Admin Portal Login{% endif %} - Live TV{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 320px); padding: 1.5rem 0;">
+    
+    <div class="channel-card" style="max-width: 450px; width: 100%; padding: 2.5rem; align-items: stretch; background: rgba(15, 22, 42, 0.75); border: 1px solid var(--border-glass-hover); box-shadow: 0 20px 40px -15px rgba(0,0,0,0.8), var(--shadow-glow);">
+        
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem; display: inline-block; filter: drop-shadow(0 0 10px var(--primary-glow));">🔒</div>
+            
+            <h1 style="font-family: var(--font-heading); font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                {% if is_setup %}Setup Admin PIN{% else %}Admin Control Portal{% endif %}
+            </h1>
+            
+            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4;">
+                {% if is_setup %}
+                    Configure a security PIN to protect your Admin dashboard and banner/ads settings.
+                {% else %}
+                    Enter your administrative security PIN code to continue to the dashboard.
+                {% endif %}
+            </p>
+        </div>
+        
+        {% if error %}
+        <div style="background: rgba(244, 63, 94, 0.15); border: 1px solid var(--accent); color: #fda4af; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1.5rem; text-align: center; font-weight: 500;">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            
+            {% if is_setup %}
+                <!-- Setup Mode Fields -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Choose a Security PIN</label>
+                    <input type="password" name="pin" class="search-input" style="padding-left: 1.25rem; border-radius: 8px; text-align: center; font-size: 1.1rem; letter-spacing: 4px;" placeholder="••••" required autofocus autocomplete="new-password">
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Confirm Security PIN</label>
+                    <input type="password" name="confirm_pin" class="search-input" style="padding-left: 1.25rem; border-radius: 8px; text-align: center; font-size: 1.1rem; letter-spacing: 4px;" placeholder="••••" required autocomplete="new-password">
+                </div>
+            {% else %}
+                <!-- Login Mode Field -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Enter PIN Code</label>
+                    <input type="password" name="pin" class="search-input" style="padding-left: 1.25rem; border-radius: 8px; text-align: center; font-size: 1.2rem; letter-spacing: 6px;" placeholder="••••" required autofocus autocomplete="current-password">
+                </div>
+            {% endif %}
+            
+            <button type="submit" class="btn-primary" style="justify-content: center; width: 100%; margin-top: 1rem; padding: 0.75rem 2rem;">
+                <i data-lucide="shield-check"></i> {% if is_setup %}Set PIN & Login{% else %}Authenticate PIN{% endif %}
+            </button>
+            
+        </form>
+        
+        <div style="text-align: center; margin-top: 1.5rem;">
+            <a href="/" style="font-size: 0.8rem; color: var(--text-dim); transition: var(--transition-smooth);" onmouseover="this.style.color='var(--text-muted)'" onmouseout="this.style.color='var(--text-dim)'">
+                ← Return to Channels Page
+            </a>
+        </div>
+        
+    </div>
+    
+</div>
+{% endblock %}
