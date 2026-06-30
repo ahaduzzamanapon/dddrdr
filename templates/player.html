@@ -179,15 +179,27 @@
                         if (drmType.toLowerCase() === 'clearkey') {
                             const parts = drmKey.split(':');
                             if (parts.length === 2) {
-                                const keyId = parts[0].trim();
-                                const keyValue = parts[1].trim();
+                                // Convert Hex strings to Base64URL format required by EME/DashJS
+                                const hexToBase64Url = (hex) => {
+                                    let str = '';
+                                    for (let i = 0; i < hex.length; i += 2) {
+                                        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+                                    }
+                                    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                                };
+                                
+                                const keyIdHex = parts[0].trim();
+                                const keyValueHex = parts[1].trim();
+                                
+                                const keyIdB64Url = hexToBase64Url(keyIdHex);
+                                const keyValueB64Url = hexToBase64Url(keyValueHex);
                                 
                                 const protectionData = {
                                     "org.w3.clearkey": {
                                         "clearkeys": {}
                                     }
                                 };
-                                protectionData["org.w3.clearkey"]["clearkeys"][keyId] = keyValue;
+                                protectionData["org.w3.clearkey"]["clearkeys"][keyIdB64Url] = keyValueB64Url;
                                 
                                 dashPlayer.setProtectionData(protectionData);
                                 console.log("ClearKey DRM loaded successfully:", protectionData);
