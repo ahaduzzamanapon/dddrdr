@@ -689,7 +689,7 @@ def player_page(channel_id):
     # If CORS fails, the player's JavaScript will automatically reload with force_proxy=true.
     
     # Auto-proxy http streams because modern browsers block http streams on https websites (Mixed Content)
-    if stream_url_lower.startswith("http://"):
+    if stream_url_lower.startswith("http://") and request.is_secure:
         is_proxied = True
         
     if is_proxied:
